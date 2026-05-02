@@ -27,3 +27,18 @@ def test_resolve_cycle_does_not_infinite_loop():
     data = json.loads(r.stdout)
     assert len(data["files"]) == 2
     assert any("cycle" in w.lower() or "already" in w.lower() for w in data["warnings"])
+
+
+def test_commented_out_include_is_ignored():
+    r = run("tests/fixtures/tex/commented_include/main.tex")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    names = sorted(Path(p).name for p in data["files"])
+    assert names == ["main.tex", "real.tex"]
+    assert not any("commented_out" in w for w in data["warnings"])
+
+
+def test_missing_main_exits_nonzero():
+    r = run("tests/fixtures/tex/does_not_exist.tex")
+    assert r.returncode == 1
+    assert "not found" in r.stderr.lower()

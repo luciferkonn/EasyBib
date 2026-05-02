@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 _INCLUDE = re.compile(r"\\(?:input|include|subfile)\s*\{([^}]+)\}")
+_COMMENT = re.compile(r"(?<!\\)%[^\n]*")
 
 
 def resolve(main: Path) -> tuple[list[str], list[str]]:
@@ -30,7 +31,7 @@ def resolve(main: Path) -> tuple[list[str], list[str]]:
             return
         visited.add(p)
         order.append(p)
-        text = p.read_text()
+        text = _COMMENT.sub("", p.read_text())
         for m in _INCLUDE.finditer(text):
             target = m.group(1).strip()
             candidates = [
@@ -53,7 +54,11 @@ def main_cli(argv: list[str]) -> int:
     if len(argv) != 2:
         print(__doc__, file=sys.stderr)
         return 2
-    files, warnings = resolve(Path(argv[1]))
+    main = Path(argv[1])
+    if not main.exists():
+        print(f"error: main tex file not found: {main}", file=sys.stderr)
+        return 1
+    files, warnings = resolve(main)
     json.dump({"files": files, "warnings": warnings}, sys.stdout, indent=2)
     return 0
 
