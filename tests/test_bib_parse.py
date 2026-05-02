@@ -60,3 +60,12 @@ def test_string_and_comment_directives_are_skipped():
     entries = json.loads(result.stdout)
     assert len(entries) == 1
     assert entries[0]["key"] == "realentry"
+
+
+def test_backslash_escaped_quotes_do_not_break_entry_boundary():
+    result = run(["parse", "tests/fixtures/bib/escaped_quote.bib"])
+    assert result.returncode == 0, result.stderr
+    entries = json.loads(result.stdout)
+    assert len(entries) == 1
+    assert entries[0]["fields"]["year"] == "2020"
+    assert "has" in entries[0]["fields"]["note"]

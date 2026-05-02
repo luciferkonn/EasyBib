@@ -30,14 +30,20 @@ _SKIP_TYPES = {"string", "comment", "preamble"}
 
 
 def _strip_quoted(line: str) -> str:
-    """Return line with content inside double-quoted spans replaced by spaces.
-
-    This prevents ``{`` / ``}`` characters inside quoted field values from
-    being counted toward the brace-depth tracker.
+    """Replace characters inside double-quoted spans with spaces so that
+    `{`/`}` inside string values are not counted toward brace depth.
+    Handles backslash-escaped characters (e.g. `\\"`) inside quoted spans.
     """
     result = []
     in_quotes = False
-    for ch in line:
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if in_quotes and ch == "\\" and i + 1 < len(line):
+            result.append(" ")
+            result.append(" ")
+            i += 2
+            continue
         if ch == '"':
             in_quotes = not in_quotes
             result.append(ch)
@@ -45,6 +51,7 @@ def _strip_quoted(line: str) -> str:
             result.append(" ")
         else:
             result.append(ch)
+        i += 1
     return "".join(result)
 
 
