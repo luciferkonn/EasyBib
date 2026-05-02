@@ -30,10 +30,9 @@ def test_parse_clean_bib_returns_two_entries():
     assert entries[0]["raw_text"].startswith("@inproceedings{")
 
 
-def test_parse_clean_bib_round_trip_is_byte_identical():
+def test_parse_clean_bib_raw_text_appears_in_original():
     result = run(["parse", "tests/fixtures/bib/clean.bib"])
     entries = json.loads(result.stdout)
-    reconstructed = "\n\n".join(e["raw_text"] for e in entries)
     original = Path("tests/fixtures/bib/clean.bib").read_text()
     for entry in entries:
         assert entry["raw_text"].strip() in original
@@ -44,3 +43,20 @@ def test_parse_malformed_bib_reports_line():
     assert result.returncode != 0
     assert "line" in result.stderr.lower()
     assert "broken_entry" in result.stderr or "6" in result.stderr or "7" in result.stderr
+
+
+def test_quoted_string_braces_do_not_break_entry_boundary():
+    result = run(["parse", "tests/fixtures/bib/quoted_brace.bib"])
+    assert result.returncode == 0, result.stderr
+    entries = json.loads(result.stdout)
+    assert len(entries) == 1
+    assert entries[0]["fields"]["year"] == "2020"
+    assert "has a } here" in entries[0]["fields"]["note"]
+
+
+def test_string_and_comment_directives_are_skipped():
+    result = run(["parse", "tests/fixtures/bib/with_string.bib"])
+    assert result.returncode == 0, result.stderr
+    entries = json.loads(result.stdout)
+    assert len(entries) == 1
+    assert entries[0]["key"] == "realentry"

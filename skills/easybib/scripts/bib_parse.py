@@ -26,6 +26,50 @@ class Entry:
 
 _ENTRY_START = re.compile(r"@(?P<type>[A-Za-z]+)\s*\{\s*(?P<key>[^,\s]+)\s*,")
 
+_SKIP_TYPES = {"string", "comment", "preamble"}
+
+
+def _strip_quoted(line: str) -> str:
+    """Return line with content inside double-quoted spans replaced by spaces.
+
+    This prevents ``{`` / ``}`` characters inside quoted field values from
+    being counted toward the brace-depth tracker.
+    """
+    result = []
+    in_quotes = False
+    for ch in line:
+        if ch == '"':
+            in_quotes = not in_quotes
+            result.append(ch)
+        elif in_quotes:
+            result.append(" ")
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
+def _brace_depth(line: str) -> int:
+    """Return net brace depth change for *line*, ignoring quoted spans."""
+    stripped = _strip_quoted(line)
+    return stripped.count("{") - stripped.count("}")
+
+
+def _consume_block(lines: list[str], start: int) -> int:
+    """Walk forward from *start* until the brace block that opened on lines[start]
+    is closed.  Returns the index *j* such that lines[start:j] is the full block.
+    Raises ValueError on unbalanced braces.
+    """
+    depth = _brace_depth(lines[start])
+    j = start + 1
+    while j < len(lines) and depth > 0:
+        depth += _brace_depth(lines[j])
+        j += 1
+    if depth != 0:
+        raise ValueError(
+            f"malformed entry starting at line {start + 1}: unbalanced braces"
+        )
+    return j
+
 
 def parse(path: Path) -> list[Entry]:
     text = path.read_text()
@@ -36,23 +80,21 @@ def parse(path: Path) -> list[Entry]:
         m = _ENTRY_START.match(lines[i])
         if not m:
             if lines[i].lstrip().startswith("@"):
+                # Check whether this is a known skip-type directive.
+                type_match = re.match(r"@([A-Za-z]+)", lines[i].lstrip())
+                if type_match and type_match.group(1).lower() in _SKIP_TYPES:
+                    # Consume the whole directive block without recording it.
+                    i = _consume_block(lines, i)
+                    continue
                 raise ValueError(
                     f"malformed entry at line {i + 1}: missing comma after key"
                 )
             i += 1
             continue
         start_line = i + 1
-        raw_lines = [lines[i]]
-        depth = lines[i].count("{") - lines[i].count("}")
-        j = i + 1
-        while j < len(lines) and depth > 0:
-            raw_lines.append(lines[j])
-            depth += lines[j].count("{") - lines[j].count("}")
-            j += 1
-        if depth != 0:
-            raise ValueError(f"malformed entry starting at line {start_line}: unbalanced braces")
-        raw_text = "".join(raw_lines).rstrip("\n")
-        body = "".join(raw_lines)[m.end():]
+        j = _consume_block(lines, i)
+        raw_text = "".join(lines[i:j]).rstrip("\n")
+        body = "".join(lines[i:j])[m.end():]
         fields = _parse_fields(body)
         entries.append(
             Entry(
@@ -88,7 +130,7 @@ def _parse_fields(body: str) -> dict:
 def _cmd_parse(path: str) -> int:
     try:
         entries = parse(Path(path))
-    except ValueError as e:
+    except (ValueError, OSError) as e:
         print(str(e), file=sys.stderr)
         return 2
     json.dump([asdict(e) for e in entries], sys.stdout, indent=2)
@@ -96,11 +138,27 @@ def _cmd_parse(path: str) -> int:
 
 
 def _cmd_write(path: str, json_path: str) -> int:
-    entries = json.loads(Path(json_path).read_text())
-    content = "\n\n".join(e["raw_text"] for e in entries) + "\n"
-    tmp = Path(path + ".tmp")
-    tmp.write_text(content)
-    tmp.replace(path)
+    try:
+        entries = json.loads(Path(json_path).read_text())
+        content = "\n\n".join(e["raw_text"] for e in entries) + "\n"
+        tmp = Path(path + ".tmp")
+        tmp.write_text(content)
+        replaced = False
+        try:
+            tmp.replace(path)
+            replaced = True
+        finally:
+            if not replaced:
+                tmp.unlink(missing_ok=True)
+    except FileNotFoundError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    except json.JSONDecodeError as e:
+        print(f"invalid JSON: {e}", file=sys.stderr)
+        return 2
+    except OSError as e:
+        print(str(e), file=sys.stderr)
+        return 2
     return 0
 
 
