@@ -14,8 +14,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SECTION = re.compile(r"\\section\*?\s*\{([^}]*)\}")
-_CITE = re.compile(r"\\(cite|citep|citet)\s*(\[[^\]]*\])?\s*\{([^}]*)\}")
+_COMMENT = re.compile(r"(?<!\\)%[^\n]*")
+_SECTION = re.compile(r"\\section\*?(?:\[[^\]]*\])?\s*\{([^}]*)\}")
+_CITE = re.compile(r"\\(cite|citep|citet)\s*(?:\[[^\]]*\]){0,2}\s*\{([^}]*)\}")
 DEFAULT_PLACEHOLDERS = {"", "?", "TODO", "FIXME", "XXX"}
 PREAMBLE = "__preamble__"
 CONTEXT_CHARS = 80
@@ -40,13 +41,14 @@ def scan(main: Path, placeholders: set[str]) -> dict:
         text = path.read_text()
         current_section = PREAMBLE
         for line_num, line in enumerate(text.splitlines(), start=1):
-            sm = _SECTION.search(line)
+            stripped_line = _COMMENT.sub(lambda m: " " * len(m.group(0)), line)
+            sm = _SECTION.search(stripped_line)
             if sm:
                 current_section = sm.group(1).strip()
                 sections.append({"title": current_section, "file": str(path), "line": line_num})
-            for m in _CITE.finditer(line):
+            for m in _CITE.finditer(stripped_line):
                 command = m.group(1)
-                raw_keys = m.group(3).strip()
+                raw_keys = m.group(2).strip()
                 col = m.start() + 1
                 context_before = line[max(0, m.start() - CONTEXT_CHARS) : m.start()].strip()
                 context_after = line[m.end() : m.end() + CONTEXT_CHARS].strip()
@@ -65,7 +67,12 @@ def scan(main: Path, placeholders: set[str]) -> dict:
                         }
                     )
                     continue
-                for k in (x.strip() for x in raw_keys.split(",") if x.strip()):
+                real_keys = (
+                    x.strip()
+                    for x in raw_keys.split(",")
+                    if x.strip() and x.strip() not in placeholders
+                )
+                for k in real_keys:
                     cite_keys.append(
                         {
                             "key": k,
@@ -85,7 +92,12 @@ def main_cli(argv: list[str]) -> int:
         return 2
     main = Path(argv[1])
     placeholders = set(argv[2:]) if len(argv) > 2 else DEFAULT_PLACEHOLDERS
-    result = scan(main, placeholders)
+    try:
+        result = scan(main, placeholders)
+    except subprocess.CalledProcessError as e:
+        if e.stderr:
+            print(e.stderr.strip(), file=sys.stderr)
+        return 1
     json.dump(result, sys.stdout, indent=2)
     return 0
 

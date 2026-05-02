@@ -46,3 +46,48 @@ def test_sections_recorded_in_document_order():
     r = run("tests/fixtures/tex/sections/main.tex")
     data = json.loads(r.stdout)
     assert [s["title"] for s in data["sections"]] == ["Alpha", "Beta"]
+
+
+def test_section_with_optional_bracket_argument_is_captured():
+    r = run("tests/fixtures/tex/scan_edge/main.tex")
+    assert r.returncode == 0, r.stderr
+    data = json.loads(r.stdout)
+    titles = [s["title"] for s in data["sections"]]
+    assert "Long Title With [brackets]" in titles
+
+
+def test_two_bracket_citep_is_matched():
+    r = run("tests/fixtures/tex/scan_edge/main.tex")
+    data = json.loads(r.stdout)
+    # realkey is in cite_keys
+    keys = [k["key"] for k in data["cite_keys"]]
+    assert "realkey" in keys
+    # TODO inside \citep[][p.9]{TODO} is an empty cite
+    placeholders = [e["placeholder"] for e in data["empty_cites"]]
+    assert "TODO" in placeholders
+
+
+def test_commented_cite_is_not_matched():
+    r = run("tests/fixtures/tex/scan_edge/main.tex")
+    data = json.loads(r.stdout)
+    keys = [k["key"] for k in data["cite_keys"]]
+    assert "commented_out" not in keys
+    empties = [e["placeholder"] for e in data["empty_cites"]]
+    # nothing from the commented line should show up
+    assert not any("commented_out" in str(e) for e in empties)
+
+
+def test_mixed_placeholder_cite_excludes_todo_from_cite_keys():
+    r = run("tests/fixtures/tex/scan_edge/main.tex")
+    data = json.loads(r.stdout)
+    keys = [k["key"] for k in data["cite_keys"]]
+    assert "real_key" in keys
+    assert "TODO" not in keys
+
+
+def test_missing_main_tex_exits_nonzero_cleanly():
+    r = run("tests/fixtures/tex/does_not_exist.tex")
+    assert r.returncode == 1
+    assert "not found" in r.stderr.lower()
+    # Verify no Python traceback
+    assert "Traceback" not in r.stderr
