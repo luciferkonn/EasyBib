@@ -39,12 +39,17 @@ def _cache_get(slug: str) -> dict | None:
         return None
     if time.time() - p.stat().st_mtime > CACHE_TTL:
         return None
-    return json.loads(p.read_text())
+    try:
+        return json.loads(p.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def _cache_put(slug: str, obj: dict) -> None:
     p = _cache_dir() / f"{slug}.json"
-    p.write_text(json.dumps(obj))
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(obj))
+    tmp.replace(p)
 
 
 def _slug(s: str) -> str:
@@ -81,6 +86,13 @@ def _fetch_search(query: str) -> dict:
             data = r.json()
             _cache_put(f"search_{_slug(query)}", data)
             return data
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 0
+            if status and status < 500:
+                raise  # don't retry 4xx
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
         except requests.RequestException:
             if attempt == 2:
                 raise
@@ -91,7 +103,7 @@ def _fetch_search(query: str) -> dict:
 def _classify_type(dblp_key: str) -> str:
     if dblp_key.startswith("conf/"):
         return "conf"
-    if dblp_key.startswith("journals/corr"):
+    if dblp_key.startswith("journals/corr/"):
         return "corr"
     if dblp_key.startswith("journals/"):
         return "journals"
@@ -103,7 +115,7 @@ def _sort_candidates(cands: list[dict], prefer_preprint: bool) -> list[dict]:
         t = c["type"]
         corr_rank = 0 if prefer_preprint else 2
         type_rank = {"conf": 0, "journals": 1, "corr": corr_rank, "other": 3}.get(t, 3)
-        return (type_rank, c["year"], c["dblp_key"])
+        return (c["year"], type_rank, c["dblp_key"])
 
     return sorted(cands, key=key)
 
@@ -133,12 +145,18 @@ def search(query: str, prefer_preprint: bool = False) -> list[dict]:
     return _sort_candidates(candidates, prefer_preprint)
 
 
+def _bibtex_fixture_slug(dblp_key: str) -> str:
+    tail = dblp_key.rsplit("/", 1)[-1]
+    return re.sub(r"[^a-z0-9]+", "_", tail.lower()).strip("_")
+
+
 def fetch_bibtex(dblp_key: str) -> str:
     cached_key = f"bib_{_slug(dblp_key)}"
     cached = _cache_get(cached_key)
     if cached is not None:
         return cached["bibtex"]
-    fx = _fixture(cached_key)
+    fx_slug = _bibtex_fixture_slug(dblp_key)
+    fx = _fixture(f"bib_{fx_slug}")
     if fx is not None:
         return fx["bibtex"]
     if os.environ.get("EASYBIB_OFFLINE"):
@@ -150,11 +168,39 @@ def fetch_bibtex(dblp_key: str) -> str:
             text = r.text
             _cache_put(cached_key, {"bibtex": text})
             return text
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code if e.response is not None else 0
+            if status and status < 500:
+                raise  # don't retry 4xx
+            if attempt == 2:
+                raise
+            time.sleep(2 ** attempt)
         except requests.RequestException:
             if attempt == 2:
                 raise
             time.sleep(2 ** attempt)
     raise RuntimeError("unreachable")
+
+
+def _cmd_search(args: list[str]) -> int:
+    prefer = False
+    positional: list[str] = []
+    for a in args:
+        if a == "--prefer-preprint":
+            prefer = True
+        else:
+            positional.append(a)
+    if not positional:
+        print(__doc__, file=sys.stderr)
+        return 2
+    query = positional[0]
+    try:
+        cands = search(query, prefer_preprint=prefer)
+    except (requests.RequestException, RuntimeError, json.JSONDecodeError) as e:
+        print(str(e), file=sys.stderr)
+        return 3
+    json.dump({"candidates": cands}, sys.stdout, indent=2)
+    return 0
 
 
 def main_cli(argv: list[str]) -> int:
@@ -163,24 +209,13 @@ def main_cli(argv: list[str]) -> int:
         return 2
     cmd = argv[1]
     if cmd == "search":
-        if len(argv) < 3:
-            print(__doc__, file=sys.stderr)
-            return 2
-        prefer = "--prefer-preprint" in argv[3:]
-        query = argv[2]
-        try:
-            cands = search(query, prefer_preprint=prefer)
-        except Exception as e:
-            print(str(e), file=sys.stderr)
-            return 3
-        json.dump({"candidates": cands}, sys.stdout, indent=2)
-        return 0
+        return _cmd_search(argv[2:])
     if cmd == "bibtex":
         if len(argv) < 3:
             return 2
         try:
             text = fetch_bibtex(argv[2])
-        except Exception as e:
+        except (requests.RequestException, RuntimeError) as e:
             print(str(e), file=sys.stderr)
             return 3
         sys.stdout.write(text)
