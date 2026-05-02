@@ -1,4 +1,4 @@
-# Bib-Easy — Design Spec
+# EasyBib — Design Spec
 
 **Date:** 2026-05-01
 **Status:** Approved
@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-Bib-Easy is a Claude Code plugin that helps LaTeX authors maintain correct,
+EasyBib is a Claude Code plugin that helps LaTeX authors maintain correct,
 DBLP-sourced bibliographies. It ships as a hybrid: one agent skill that
 auto-triggers on relevant natural-language requests, plus four slash commands
 for explicit invocation.
@@ -35,12 +35,12 @@ for explicit invocation.
 ## 2. Architecture & Repository Layout
 
 ```
-bib-easy/
+easybib/
 ├── plugin.json                      # Claude Code plugin manifest
 ├── README.md                        # install + usage
 ├── LICENSE
 ├── skills/
-│   └── bib-easy/
+│   └── easybib/
 │       ├── SKILL.md                 # Level 2: core workflow, decision rules
 │       ├── DBLP.md                  # Level 3: DBLP API reference
 │       ├── MATCHING.md              # Level 3: fuzzy match algo & thresholds
@@ -74,7 +74,7 @@ bib-easy/
 
 ```yaml
 ---
-name: bib-easy
+name: easybib
 description: Validate, resolve, fill, and organize bibtex citations from DBLP. Use when working with .bib files, empty \cite{} commands in LaTeX, or when the user asks to check, suggest, create, or organize bibliography entries.
 ---
 ```
@@ -104,7 +104,7 @@ each confidence tier.
 | `scholar_fetch.py` | query string | JSON: top candidate or `None` | `/suggest`, `/create` |
 | `fuzzy_match.py` | existing entry + DBLP/Scholar candidates | scored list + top tier (`high`/`medium`/`low`/`none`) | `/check`, `/suggest`, `/create` |
 | `organize_bib.py` | `.bib` entries + section-ordered cite keys | reordered `.bib` content with section headers + `% Unused` tail | `/organize` |
-| `changelog.py` | action record | appends to `.bib-easy.log` (JSONL) | all four |
+| `changelog.py` | action record | appends to `.easybib.log` (JSONL) | all four |
 
 ### Dependencies
 
@@ -127,8 +127,8 @@ read .bib → bib_parse.py → for each entry:
   dblp_fetch.py (by DBLP-key / DOI / title) → fuzzy_match.py → tier
     high    → replace in-place, log
     medium  → prompt user in chat, apply choice, log
-    low     → mark in .bib-easy-review.md, log
-    none    → mark in .bib-easy-review.md, log
+    low     → mark in .easybib-review.md, log
+    none    → mark in .easybib-review.md, log
 → atomic write .bib (only if changes) → write changelog
 ```
 
@@ -138,9 +138,9 @@ read .bib → bib_parse.py → for each entry:
 tex_resolve.py → tex_scan.py (empty cites) → for each empty cite:
   1. WebSearch(context + placeholder) → candidate title/authors
   2. dblp_fetch.py → match? tier it
-  3. else scholar_fetch.py → match? mark % bib-easy: source=scholar
-  4. else use raw WebSearch → mark % bib-easy: source=web UNVERIFIED
-     AND append to .bib-easy-review.md ("please double-check")
+  3. else scholar_fetch.py → match? mark % easybib: source=scholar
+  4. else use raw WebSearch → mark % easybib: source=web UNVERIFIED
+     AND append to .easybib-review.md ("please double-check")
   routing by confidence (applies to tiers 2 & 3):
     high    → fill \cite{key}, append to .bib, log
     medium  → prompt in chat (show context + top 3), apply choice, log
@@ -219,13 +219,13 @@ Strip `editor`, `publisher`, `pages`, `bibsource`, `biburl`.
 
 ### Caching & rate limiting
 
-- DBLP: cache JSON in `.bib-easy-cache/dblp/<sha1(query)>.json`, 7-day TTL.
-- Scholar: same pattern under `.bib-easy-cache/scholar/`.
-- `.bib-easy-cache/` added to `.gitignore` on first run.
+- DBLP: cache JSON in `.easybib-cache/dblp/<sha1(query)>.json`, 7-day TTL.
+- Scholar: same pattern under `.easybib-cache/scholar/`.
+- `.easybib-cache/` added to `.gitignore` on first run.
 
 ## 6. Configuration
 
-Optional `.bib-easy.toml` at project root:
+Optional `.easybib.toml` at project root:
 
 ```toml
 prefer_preprint = false
@@ -243,12 +243,12 @@ All keys optional. Defaults above apply when unset.
 - `.bib` — modified in place (atomic).
 - `.bib.bak` — written once per session before first destructive edit.
   **Skipped if git working tree is clean** (git is the better backup).
-- `.bib-easy.log` — JSONL changelog, append-only. One record per action:
+- `.easybib.log` — JSONL changelog, append-only. One record per action:
   `{ts, command, entry_key, action: "replaced"|"added"|"flagged"|"skipped"|"review_resolved", confidence, source: "dblp"|"scholar"|"web"|"cache", reason?}`.
-- `.bib-easy-review.md` — human queue of low/none-confidence items. Actively
+- `.easybib-review.md` — human queue of low/none-confidence items. Actively
   cleaned up by subsequent runs when the underlying condition resolves (empty
   cite now filled, flagged entry now matches DBLP). Each cleanup is logged
-  to `.bib-easy.log` as `review_resolved` so the audit trail persists.
+  to `.easybib.log` as `review_resolved` so the audit trail persists.
 
 ## 8. Error Handling
 
@@ -259,7 +259,7 @@ All keys optional. Defaults above apply when unset.
 | Scholar block/captcha | Log `scholar_blocked`. Skip Scholar for rest of run. |
 | WebSearch nothing usable | Tier "none" — flag in review file. |
 | Malformed `.bib` parse error | Abort before any write. Report line number. |
-| `main.tex` not found | Auto-detect: scan project root and one level down for files containing `\documentclass`. If exactly one, use it. If zero or multiple, ask the user. Cache the choice in `.bib-easy.toml` as `main_tex` if the user confirms. |
+| `main.tex` not found | Auto-detect: scan project root and one level down for files containing `\documentclass`. If exactly one, use it. If zero or multiple, ask the user. Cache the choice in `.easybib.toml` as `main_tex` if the user confirms. |
 | `\input{}` missing file | Warn, skip that file, continue. |
 | Duplicate cite-key collision on `/create`/`/suggest` | Suffix with `a`, `b`, ... Log collision. |
 | Python deps missing | Print install command, stop. No auto-install. |
