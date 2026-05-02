@@ -1,0 +1,29 @@
+{
+  "result": {
+    "hits": {
+      "hit": [
+        {
+          "info": {
+            "key": "conf/nips/VaswaniSPUJGKP17",
+            "type": "Conference and Workshop Papers",
+            "title": "Attention is All you Need",
+            "authors": {"author": [{"text": "Ashish Vaswani"}, {"text": "Noam Shazeer"}]},
+            "venue": "NIPS",
+            "year": "2017",
+            "doi": "10.0/1"
+          }
+        },
+        {
+          "info": {
+            "key": "journals/corr/VaswaniSPUJGKP17",
+            "type": "Informal and Other Publications",
+            "title": "Attention is All you Need",
+            "authors": {"author": [{"text": "Ashish Vaswani"}]},
+            "venue": "CoRR",
+            "year": "2017"
+          }
+        }
+      ]
+    }
+  }
+}
