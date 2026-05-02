@@ -25,6 +25,15 @@ def _norm(s: str) -> str:
     return " ".join(s.lower().split())
 
 
+def _last_name(author: str) -> str:
+    """Return the last name from 'First Last' or 'Last, First' formats."""
+    normed = _norm(author)
+    if "," in normed:
+        return normed.split(",", 1)[0].split()[-1]
+    tokens = normed.split()
+    return tokens[-1] if tokens else ""
+
+
 def _title_score(a: str, b: str) -> float:
     return fuzz.token_set_ratio(_norm(a), _norm(b)) / 100.0
 
@@ -32,8 +41,10 @@ def _title_score(a: str, b: str) -> float:
 def _author_overlap(a: list[str], b: list[str]) -> float:
     if not a or not b:
         return 0.0
-    la = {_norm(x).split()[-1] for x in a if x.strip()}
-    lb = {_norm(x).split()[-1] for x in b if x.strip()}
+    la = {_last_name(x) for x in a if x.strip()}
+    lb = {_last_name(x) for x in b if x.strip()}
+    la = {n for n in la if n}
+    lb = {n for n in lb if n}
     if not la or not lb:
         return 0.0
     return len(la & lb) / len(la | lb)
@@ -56,12 +67,19 @@ def tier_for(score_: float, high: float, medium: float) -> str:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
-    entry = payload["entry"]
-    candidates = payload["candidates"]
+    try:
+        payload = json.load(sys.stdin)
+        entry = payload["entry"]
+        candidates = payload["candidates"]
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"fuzzy_match: {e}", file=sys.stderr)
+        return 2
     thresholds = payload.get("thresholds", {})
     high = float(thresholds.get("high", DEFAULT_HIGH))
     medium = float(thresholds.get("medium", DEFAULT_MEDIUM))
+    if high < medium:
+        print("fuzzy_match: high threshold must be >= medium threshold", file=sys.stderr)
+        return 2
     scored = sorted(
         ({"id": c["id"], "score": score(entry, c)} for c in candidates),
         key=lambda x: x["score"],

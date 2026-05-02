@@ -52,3 +52,54 @@ def test_no_candidates_returns_none_tier():
     data = run({"entry": {"title": "X", "authors": []}, "candidates": []})
     assert data["tier"] == "none"
     assert data["scored"] == []
+
+
+def test_bibtex_last_first_author_matches_dblp_first_last():
+    """BibTeX entries use 'Vaswani, Ashish'; DBLP uses 'Ashish Vaswani'.
+    Both must score as the same author."""
+    data = run({
+        "entry": {
+            "title": "Attention is All you Need",
+            "authors": ["Vaswani, Ashish", "Shazeer, Noam"],
+        },
+        "candidates": [
+            {
+                "id": "c1",
+                "title": "Attention is All you Need",
+                "authors": ["Ashish Vaswani", "Noam Shazeer"],
+            },
+        ],
+    })
+    assert data["tier"] == "high"
+    assert data["scored"][0]["score"] >= 0.95
+
+
+def test_malformed_stdin_exits_cleanly():
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT)], input="not json",
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 2
+    assert "Traceback" not in r.stderr
+
+
+def test_missing_entry_key_exits_cleanly():
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT)], input='{"candidates": []}',
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 2
+    assert "Traceback" not in r.stderr
+
+
+def test_inverted_thresholds_rejected():
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT)],
+        input=json.dumps({
+            "entry": {"title": "X", "authors": []},
+            "candidates": [],
+            "thresholds": {"high": 0.5, "medium": 0.9},
+        }),
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 2
