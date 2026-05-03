@@ -15,7 +15,6 @@ import json
 import sys
 
 PREAMBLE = "__preamble__"
-UNUSED = "__unused__"
 
 
 def organize(entries: list[dict], cite_order: list[dict]) -> str:
@@ -23,7 +22,7 @@ def organize(entries: list[dict], cite_order: list[dict]) -> str:
     section_order: list[str] = []
     for c in cite_order:
         k = c["key"]
-        sec = c["section"] or PREAMBLE
+        sec = c.get("section") or PREAMBLE
         if k in first_section:
             continue
         first_section[k] = sec
@@ -33,12 +32,13 @@ def organize(entries: list[dict], cite_order: list[dict]) -> str:
     by_section: dict[str, list[dict]] = {s: [] for s in section_order}
     unused: list[dict] = []
     placed: set[str] = set()
+    entry_by_key = {e["key"]: e for e in entries}
 
     for c in cite_order:
         k = c["key"]
         if k in placed:
             continue
-        target = next((e for e in entries if e["key"] == k), None)
+        target = entry_by_key.get(k)
         if target is None:
             continue
         sec = first_section[k]
