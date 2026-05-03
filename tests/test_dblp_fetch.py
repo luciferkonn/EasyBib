@@ -1,7 +1,6 @@
 import json
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 SCRIPT = Path("skills/easybib/scripts/dblp_fetch.py").resolve()
@@ -132,7 +131,8 @@ def test_bibtex_fixture_by_readable_name(tmp_path):
     fx = tmp_path / "dblp"
     fx.mkdir()
     key_tail_slug = "vaswanispujgkp17"
-    (fx / f"bib_{key_tail_slug}.json").write_text(json.dumps({"bibtex": "@inproceedings{X, year=2017}\n"}))
+    bibtex_data = {"bibtex": "@inproceedings{X, year=2017}\n"}
+    (fx / f"bib_{key_tail_slug}.json").write_text(json.dumps(bibtex_data))
     r = run({"EASYBIB_DBLP_FIXTURES": str(fx)}, "bibtex", "conf/nips/VaswaniSPUJGKP17")
     assert r.returncode == 0, r.stderr
     assert "@inproceedings" in r.stdout

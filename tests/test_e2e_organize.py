@@ -4,7 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(".").resolve()
 TEX_SCAN = ROOT / "skills/easybib/scripts/tex_scan.py"
 BIB_PARSE = ROOT / "skills/easybib/scripts/bib_parse.py"

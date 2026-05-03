@@ -5,7 +5,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(".").resolve()
 BIB_PARSE = ROOT / "skills/easybib/scripts/bib_parse.py"
 DBLP_FETCH = ROOT / "skills/easybib/scripts/dblp_fetch.py"

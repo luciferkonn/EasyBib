@@ -47,7 +47,8 @@ def test_last_first_author_format_produces_correct_key(tmp_path):
     r = run({"EASYBIB_CACHE_DIR": str(tmp_path)}, "bert")
     data = json.loads(r.stdout)
     assert data["found"] is True
-    assert data["key"].startswith("devlin2018"), f"expected key starting devlin2018, got {data['key']}"
+    msg = f"expected key starting devlin2018, got {data['key']}"
+    assert data["key"].startswith("devlin2018"), msg
 
 
 def test_cache_hit_on_second_call(tmp_path):
@@ -61,7 +62,12 @@ def test_cache_hit_on_second_call(tmp_path):
     slug = hashlib.sha1(b"bert").hexdigest()[:16]
     cache_file = tmp_path / "scholar" / f"{slug}.json"
     assert cache_file.exists()
-    cache_file.write_text(json.dumps({"found": True, "key": "cached_marker", "bibtex": "@cached{}"}))
+    cache_data = {
+        "found": True,
+        "key": "cached_marker",
+        "bibtex": "@cached{}",
+    }
+    cache_file.write_text(json.dumps(cache_data))
     r2 = run({"EASYBIB_CACHE_DIR": str(tmp_path)}, "bert")
     assert r2.returncode == 0
     data2 = json.loads(r2.stdout)
