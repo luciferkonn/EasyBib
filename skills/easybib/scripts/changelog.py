@@ -22,7 +22,14 @@ def main() -> int:
     if len(sys.argv) != 3 or sys.argv[1] != "append":
         print(__doc__, file=sys.stderr)
         return 2
-    record = json.load(sys.stdin)
+    try:
+        record = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        print(f"changelog: invalid JSON on stdin: {exc}", file=sys.stderr)
+        return 1
+    if not isinstance(record, dict):
+        print("changelog: stdin must be a JSON object", file=sys.stderr)
+        return 1
     append(Path(sys.argv[2]), record)
     return 0
 

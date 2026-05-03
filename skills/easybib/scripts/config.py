@@ -5,6 +5,7 @@ Usage: config.py load <project_dir>
 """
 from __future__ import annotations
 
+import copy
 import json
 import sys
 from pathlib import Path
@@ -25,11 +26,15 @@ DEFAULTS: dict = {
 
 
 def load(project_dir: Path) -> dict:
-    cfg = dict(DEFAULTS)
+    cfg = copy.deepcopy(DEFAULTS)
     path = project_dir / ".easybib.toml"
     if path.exists():
         with path.open("rb") as f:
-            data = _toml.load(f)
+            try:
+                data = _toml.load(f)
+            except _toml.TOMLDecodeError as exc:
+                print(f"config: malformed .easybib.toml: {exc}", file=sys.stderr)
+                sys.exit(1)
         for k, v in data.items():
             if k in DEFAULTS:
                 cfg[k] = v
