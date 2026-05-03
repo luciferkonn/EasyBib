@@ -20,6 +20,8 @@ from pathlib import Path
 
 CACHE_TTL = 7 * 24 * 3600
 
+JOURNAL_KEYWORDS = ("journal", "transactions", "letters", "review", "science", "nature")
+
 
 def _slug(s: str) -> str:
     return hashlib.sha1(s.encode()).hexdigest()[:16]
@@ -31,6 +33,16 @@ def _cache_dir() -> Path:
     return d
 
 
+def _write_cache(path: Path, obj: dict) -> None:
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(obj))
+        tmp.replace(path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def _fixture(query: str) -> dict | None:
     fx = os.environ.get("EASYBIB_SCHOLAR_FIXTURES")
     if not fx:
@@ -40,25 +52,42 @@ def _fixture(query: str) -> dict | None:
     return json.loads(p.read_text()) if p.exists() else None
 
 
+def _last_name(author: str) -> str:
+    """Return the last name from 'First Last' or 'Last, First' formats, lowercased."""
+    normed = author.strip()
+    if not normed:
+        return ""
+    if "," in normed:
+        return normed.split(",", 1)[0].strip().split()[-1].lower()
+    tokens = normed.split()
+    return tokens[-1].lower() if tokens else ""
+
+
 def _make_key(first_author: str, year: str, title: str) -> str:
-    last = first_author.strip().split()[-1].lower() if first_author.strip() else "anon"
+    last = _last_name(first_author) or "anon"
     first_word = next(
         (w for w in re.findall(r"[A-Za-z]+", title) if len(w) > 3), "paper"
     ).lower()
     return f"{last}{year}{first_word}"
 
 
+def _is_journal_venue(venue: str) -> bool:
+    v = venue.lower()
+    return any(kw in v for kw in JOURNAL_KEYWORDS)
+
+
 def _compose_bibtex(hit: dict, key: str) -> str:
-    venue_lower = hit.get("venue", "").lower()
-    kind = "@inproceedings" if venue_lower not in {"journal", "ieee trans"} else "@article"
+    venue = hit.get("venue", "")
+    is_article = _is_journal_venue(venue)
+    kind = "@article" if is_article else "@inproceedings"
+    venue_field = "journal" if is_article else "booktitle"
     authors = " and ".join(hit.get("authors", []))
-    booktitle = hit.get("venue", "")
     return (
         f"{kind}{{{key},\n"
-        f"  author    = {{{authors}}},\n"
-        f"  title     = {{{hit.get('title', '')}}},\n"
-        f"  booktitle = {{{booktitle}}},\n"
-        f"  year      = {{{hit.get('year', '')}}},\n"
+        f"  author = {{{authors}}},\n"
+        f"  title  = {{{hit.get('title', '')}}},\n"
+        f"  {venue_field} = {{{venue}}},\n"
+        f"  year   = {{{hit.get('year', '')}}},\n"
         f"}}\n"
     )
 
@@ -80,16 +109,16 @@ def lookup(query: str) -> dict:
         key = _make_key(fx.get("authors", [""])[0] if fx.get("authors") else "",
                         str(fx.get("year", "")), fx.get("title", ""))
         result = {"found": True, "key": key, "bibtex": _compose_bibtex(fx, key)}
-        tmp = cache_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(result))
-        tmp.replace(cache_file)
+        _write_cache(cache_file, result)
         return result
     try:
         from scholarly import scholarly  # type: ignore
         hits = scholarly.search_pubs(query)
         first = next(hits, None)
         if first is None:
-            return {"found": False, "reason": "no_hits"}
+            result = {"found": False, "reason": "no_hits"}
+            _write_cache(cache_file, result)
+            return result
         bib = first.get("bib", {})
         hit = {
             "title": bib.get("title", ""),
@@ -104,12 +133,12 @@ def lookup(query: str) -> dict:
         key = _make_key(hit["authors"][0] if hit["authors"] else "",
                         hit["year"], hit["title"])
         result = {"found": True, "key": key, "bibtex": _compose_bibtex(hit, key)}
-        tmp = cache_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(result))
-        tmp.replace(cache_file)
+        _write_cache(cache_file, result)
         return result
     except Exception as e:
-        return {"found": False, "reason": f"scholar_error: {type(e).__name__}"}
+        result = {"found": False, "reason": f"scholar_error: {type(e).__name__}"}
+        _write_cache(cache_file, result)
+        return result
 
 
 def main_cli(argv: list[str]) -> int:

@@ -1,6 +1,6 @@
 {
   "title": "BERT: Pre-training of Deep Bidirectional Transformers",
-  "authors": ["Jacob Devlin", "Ming-Wei Chang"],
+  "authors": ["Devlin, Jacob", "Chang, Ming-Wei"],
   "year": "2018",
   "venue": "NAACL"
 }
