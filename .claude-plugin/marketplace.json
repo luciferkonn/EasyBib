@@ -1,0 +1,15 @@
+{
+  "name": "bib-easy",
+  "owner": {
+    "name": "luciferkonn"
+  },
+  "description": "EasyBib plugin for Claude Code — validate, resolve, fill, and organize bibtex citations from DBLP.",
+  "plugins": [
+    {
+      "name": "easybib",
+      "source": ".",
+      "description": "Validate, resolve, fill, and organize bibtex citations from DBLP.",
+      "version": "0.1.0"
+    }
+  ]
+}

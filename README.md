@@ -4,8 +4,11 @@ Claude Code plugin that keeps LaTeX bibliographies correct and tidy. Uses DBLP a
 
 ## Install
 
-```bash
-claude plugins install https://github.com/luciferkonn/EasyBib.git
+Inside Claude Code, add this repo as a plugin marketplace, then install the plugin:
+
+```
+/plugin marketplace add luciferkonn/Bib-Easy
+/plugin install easybib@bib-easy
 ```
 
 Python 3.9+ required. On first run, if dependencies are missing you'll be told to run:
