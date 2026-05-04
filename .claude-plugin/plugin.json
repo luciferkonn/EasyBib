@@ -2,6 +2,12 @@
   "name": "easybib",
   "version": "0.1.0",
   "description": "Validate, resolve, fill, and organize bibtex citations from DBLP.",
-  "skills": ["skills/easybib"],
-  "commands": ["commands/check.md", "commands/suggest.md", "commands/create.md", "commands/organize.md"]
+  "author": {
+    "name": "luciferkonn",
+    "url": "https://github.com/luciferkonn"
+  },
+  "homepage": "https://github.com/luciferkonn/EasyBib",
+  "repository": "https://github.com/luciferkonn/EasyBib",
+  "license": "MIT",
+  "keywords": ["bibtex", "latex", "dblp", "citations"]
 }
