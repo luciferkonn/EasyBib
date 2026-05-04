@@ -7,7 +7,10 @@
   "plugins": [
     {
       "name": "easybib",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "luciferkonn/EasyBib"
+      },
       "description": "Validate, resolve, fill, and organize bibtex citations from DBLP.",
       "version": "0.1.0"
     }
