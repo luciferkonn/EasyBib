@@ -7,7 +7,7 @@ Claude Code plugin that keeps LaTeX bibliographies correct and tidy. Uses DBLP a
 Inside Claude Code, add this repo as a plugin marketplace, then install the plugin:
 
 ```
-/plugin marketplace add luciferkonn/Bib-Easy
+/plugin marketplace add luciferkonn/EasyBib
 /plugin install easybib@bib-easy
 ```
 
