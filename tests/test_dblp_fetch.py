@@ -136,3 +136,15 @@ def test_bibtex_fixture_by_readable_name(tmp_path):
     r = run({"EASYBIB_DBLP_FIXTURES": str(fx)}, "bibtex", "conf/nips/VaswaniSPUJGKP17")
     assert r.returncode == 0, r.stderr
     assert "@inproceedings" in r.stdout
+
+
+def test_bibtex_strips_dblp_prefix(tmp_path):
+    fx = tmp_path / "dblp"
+    fx.mkdir()
+    # fixture name comes from the stripped key, last path component: "vaswanispujgkp17"
+    (fx / "bib_vaswanispujgkp17.json").write_text(json.dumps(
+        {"bibtex": "@inproceedings{X, year=2017}\n"}
+    ))
+    r = run({"EASYBIB_DBLP_FIXTURES": str(fx)}, "bibtex", "DBLP:conf/nips/VaswaniSPUJGKP17")
+    assert r.returncode == 0, r.stderr
+    assert "@inproceedings" in r.stdout

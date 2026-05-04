@@ -63,3 +63,21 @@ def test_preamble_section_uses_preamble_header():
         "cite_order": [{"key": "p", "section": "__preamble__"}],
     })
     assert "% === Preamble ===" in out
+
+
+def test_malformed_stdin_exits_cleanly():
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT)], input="not json",
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 2
+    assert "Traceback" not in r.stderr
+
+
+def test_missing_required_key_exits_cleanly():
+    r = subprocess.run(
+        [sys.executable, str(SCRIPT)], input=json.dumps({"entries": []}),
+        capture_output=True, text=True,
+    )
+    assert r.returncode == 2
+    assert "Traceback" not in r.stderr

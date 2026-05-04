@@ -12,7 +12,7 @@ Maintain LaTeX bibliographies using DBLP as the source of truth, with Google Sch
 - **Dependencies:** If any script exits with `ModuleNotFoundError`, print `pip install -r skills/easybib/scripts/requirements.txt` and stop. Do not auto-install.
 - **Config:** Before any workflow, run `python skills/easybib/scripts/config.py load .` and honor the returned values.
 - **Backups:** Before the first write to `.bib` or any `.tex` in a session, check `git status --porcelain`. If clean, skip the `.bak`. If dirty, write `<path>.bak` once (never overwrite an existing `.bak` from this session).
-- **Atomic writes:** always write via a `.tmp` + rename. The `bib_parse.py write` and `organize_bib.py` flows already do this.
+- **Atomic writes:** always write via a `.tmp` + rename. `bib_parse.py write` already does this. `organize_bib.py` writes to stdout only — the skill must capture its output, write to `<bib>.tmp`, then `mv` to `<bib>`.
 - **Changelog:** every action (`replaced`, `added`, `flagged`, `skipped`, `review_resolved`, `network_error`) goes to `.easybib.log` via `python skills/easybib/scripts/changelog.py append .easybib.log`.
 - **Review file:** `.easybib-review.md` holds human-queue items. At the start of every workflow, scan it and remove entries whose condition has resolved; log each removal as `review_resolved`.
 - **Dry-run:** if the user says "dry run" or passes `--dry-run`, run the workflow but skip `.bib`/`.tex` writes. Still write changelog and review file.

@@ -151,6 +151,8 @@ def _bibtex_fixture_slug(dblp_key: str) -> str:
 
 
 def fetch_bibtex(dblp_key: str) -> str:
+    if dblp_key.startswith("DBLP:"):
+        dblp_key = dblp_key[len("DBLP:"):]
     cached_key = f"bib_{_slug(dblp_key)}"
     cached = _cache_get(cached_key)
     if cached is not None:

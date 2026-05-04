@@ -67,8 +67,14 @@ def organize(entries: list[dict], cite_order: list[dict]) -> str:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
-    sys.stdout.write(organize(payload["entries"], payload["cite_order"]))
+    try:
+        payload = json.load(sys.stdin)
+        entries = payload["entries"]
+        cite_order = payload["cite_order"]
+    except (json.JSONDecodeError, KeyError) as exc:
+        print(f"organize_bib: {exc}", file=sys.stderr)
+        return 2
+    sys.stdout.write(organize(entries, cite_order))
     return 0
 
 
